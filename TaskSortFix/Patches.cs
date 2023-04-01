@@ -55,36 +55,7 @@ namespace TaskSortFix
             //Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Trader });
             //var questStringFieldComparerContsructor = 
 
-
-            switch (__instance.SortType)
-            {
-                case EQuestsSortType.Trader:
-                    list.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Trader }) as IComparer<QuestClass>);
-                    break;
-                case EQuestsSortType.Type:
-                    list.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Type }) as IComparer<QuestClass>);
-                    break;
-                case EQuestsSortType.Task:
-                    list.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Task }) as IComparer<QuestClass>);
-                    break;
-                case EQuestsSortType.Location:
-                    list.Sort(Activator.CreateInstance(QuestLocationComparer, new object[] { currentLocationId }) as IComparer<QuestClass>);
-                    break;
-                case EQuestsSortType.Status:
-                    list.Sort(Activator.CreateInstance(QuestStatusComparer) as IComparer<QuestClass>);
-                    break;
-                case EQuestsSortType.Progress:
-                    list.Sort(Activator.CreateInstance(QuestProgressComparer) as IComparer<QuestClass>);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-
-            if (__instance.SortAscend)
-            {
-                list.Reverse();
-            }
-
+            // Seems to separate quests which are available for current location.
             foreach (QuestClass questClass in list)
             {
                 bool value = string.IsNullOrEmpty(currentLocationId) || ((questClass.Template.LocationId == "any" || questClass.Template.LocationId == currentLocationId) && questClass.Template.PlayerGroup == activeProfile.Side.ToPlayerGroup());
@@ -94,8 +65,53 @@ namespace TaskSortFix
                 }
             }
 
+            // Instead of just sorting by bool in the end - do it properly by separating available and unavailable quests.
+            List<QuestClass> availableList = list.Where(quest => questsAvailability[quest]).ToList();
+            List<QuestClass> unavailableList = list.Where(quest => !questsAvailability[quest]).ToList();
+
+            switch (__instance.SortType)
+            {
+                case EQuestsSortType.Trader:
+                    availableList.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Trader }) as IComparer<QuestClass>);
+                    unavailableList.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Trader }) as IComparer<QuestClass>);
+                    break;
+                case EQuestsSortType.Type:
+                    availableList.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Type }) as IComparer<QuestClass>);
+                    unavailableList.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Type }) as IComparer<QuestClass>);
+                    break;
+                case EQuestsSortType.Task:
+                    availableList.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Task }) as IComparer<QuestClass>);
+                    unavailableList.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Task }) as IComparer<QuestClass>);
+                    break;
+                case EQuestsSortType.Location:
+                    availableList.Sort(Activator.CreateInstance(QuestLocationComparer, new object[] { currentLocationId }) as IComparer<QuestClass>);
+                    unavailableList.Sort(Activator.CreateInstance(QuestLocationComparer, new object[] { currentLocationId }) as IComparer<QuestClass>);
+                    break;
+                case EQuestsSortType.Status:
+                    availableList.Sort(Activator.CreateInstance(QuestStatusComparer) as IComparer<QuestClass>);
+                    unavailableList.Sort(Activator.CreateInstance(QuestStatusComparer) as IComparer<QuestClass>);
+                    break;
+                case EQuestsSortType.Progress:
+                    availableList.Sort(Activator.CreateInstance(QuestProgressComparer) as IComparer<QuestClass>);
+                    unavailableList.Sort(Activator.CreateInstance(QuestProgressComparer) as IComparer<QuestClass>);
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
+            if (__instance.SortAscend)
+            {
+                availableList.Reverse();
+                unavailableList.Reverse();
+            }
+
+
+            list = availableList.Concat(unavailableList).ToList();
+            
+
             // - This line fucks up the order even if you make every single quest in the dictionary true or false.
             //list.Sort((QuestClass questX, QuestClass questY) => questsAvailability[questY].CompareTo(questsAvailability[questX]));
+
             NotesTaskDescriptionShort description = notesTaskDescription.InstantiatePrefab<NotesTaskDescriptionShort>(notesTaskDescriptionTemplate);
 
             var notesTaskTemplate = typeof(TasksScreen).GetField("_notesTaskTemplate", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as NotesTask;

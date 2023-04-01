@@ -1,6 +1,6 @@
 {
     "name": "task_sort_fix",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "main": "src/mod.js",
     "license": "NCSA",
     "author": "Nightingale",
