@@ -1,0 +1,7 @@
+dist/
+dist_zip/
+node_modules/
+TaskSortFix/.vs/
+TaskSortFix/bin/
+TaskSortFix/obj/
+
