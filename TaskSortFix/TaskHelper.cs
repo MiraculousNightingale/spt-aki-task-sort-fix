@@ -12,5 +12,6 @@ namespace TaskSortFix
         public static ISession Session { get; set; }
         // Type defs
         public static Type QuestStringFieldComparer = AccessTools.TypeByName("EFT.UI.TasksScreen+QuestStringFieldComparer");
+        public static Type QuestLocationComparer = AccessTools.TypeByName("EFT.UI.TasksScreen+QuestLocationComparer");
     }
 }

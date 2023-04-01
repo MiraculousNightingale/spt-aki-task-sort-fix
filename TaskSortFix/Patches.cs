@@ -70,6 +70,7 @@ namespace TaskSortFix
             //Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Trader });
             //var questStringFieldComparerContsructor = 
 
+
             switch (__instance.SortType)
             {
                 case EQuestsSortType.Trader:
@@ -145,7 +146,7 @@ namespace TaskSortFix
         }
 
         [PatchPrefix]
-        private static void PatchPrefix(object __instance, QuestClass x, QuestClass y, ref int __result)
+        private static bool PatchPrefix(object __instance, QuestClass x, QuestClass y, ref int __result)
         {
             //  These literally return the id of a trader, there's no locale
             //Logger.LogMessage($"TraderId Localized: x {x.Template.TraderId.Localized()} y {y.Template.TraderId.Localized()}");
@@ -155,68 +156,133 @@ namespace TaskSortFix
             //Logger.LogMessage($"QuestType: x {x.Template.} y {y.Template.QuestType}");
             //Logger.LogMessage($"QuestType Localized: x {x.Template.QuestType.Localized()} y {y.Template.QuestType.Localized()}");
 
+            var xField = __instance.GetType().GetField("_xField", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
+            var yField = __instance.GetType().GetField("_yField", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
+            var sortType = (EQuestsSortType)QuestStringFieldComparer.GetField("_sortType", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance);
 
+
+            // Copy from source code, slightly tweaked to actually work.
+            if (x == y)
+            {
+                __result = 0;
+                return false;
+            }
+            if (y == null)
+            {
+                __result = 1;
+                return false;
+            }
+            if (x == null)
+            {
+                __result = -1;
+                return false;
+            }
+
+            switch (sortType)
+            {
+                case EQuestsSortType.Trader:
+                    // Just replace these with localized name instead of ids
+                    xField = Session.Traders.First(trader => trader.Id == x.Template.TraderId).LocalizedName;
+                    yField = Session.Traders.First(trader => trader.Id == y.Template.TraderId).LocalizedName;
+                    break;
+                case EQuestsSortType.Type:
+                    xField = x.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
+                    yField = y.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
+                    break;
+                case EQuestsSortType.Task:
+                    xField = x.Template.Name;
+                    yField = y.Template.Name;
+                    break;
+                case EQuestsSortType.Location:
+                case EQuestsSortType.Status:
+                case EQuestsSortType.Progress:
+                    goto IL_DF;
+                default:
+                    goto IL_DF;
+            }
+            if (!string.Equals(xField, yField))
+            {
+                __result = string.Compare(xField, yField, StringComparison.Ordinal);
+                return false;
+            }
+            __result = x.StartTime.CompareTo(y.StartTime);
+            return false;
+        IL_DF:
+            throw new ArgumentOutOfRangeException();
+        }
+    }
+
+    public class PatchQuestLocationComparer : ModulePatch
+    {
+        protected override MethodBase GetTargetMethod()
+        {
+            return QuestLocationComparer.GetMethod("Compare", BindingFlags.Instance | BindingFlags.Public);
+        }
+
+        [PatchPrefix]
+        private static bool PatchPrefix(object __instance, QuestClass x, QuestClass y, ref int __result)
+        {
+            //  These literally return the id of a trader, there's no locale
+            //Logger.LogMessage($"TraderId Localized: x {x.Template.TraderId.Localized()} y {y.Template.TraderId.Localized()}");
+            //Logger.LogMessage($"TraderId LocalizedName: x {x.Template.TraderId.LocalizedName()} y {y.Template.TraderId.LocalizedName()}");
+
+            //  Doesn't work for Quest Type
+            //Logger.LogMessage($"QuestType: x {x.Template.} y {y.Template.QuestType}");
+            //Logger.LogMessage($"QuestType Localized: x {x.Template.QuestType.Localized()} y {y.Template.QuestType.Localized()}");
 
             var xField = __instance.GetType().GetField("_xField", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
             var yField = __instance.GetType().GetField("_yField", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
             var sortType = (EQuestsSortType)QuestStringFieldComparer.GetField("_sortType", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance);
 
-            //  This should work okay for quest type, don't know about different languages though
-            //Logger.LogMessage($"QuestType StringNoBox: x {x.Template.QuestType.ToStringNoBox()} y {y.Template.QuestType.ToStringNoBox()}");
 
             // Copy from source code, slightly tweaked to actually work.
+            if (x == y)
+            {
+                __result = 0;
+                return false;
+            }
+            if (y == null)
+            {
+                __result = 1;
+                return false;
+            }
+            if (x == null)
+            {
+                __result = -1;
+                return false;
+            }
 
-            //if (x == y)
-            //{
-            //    __result = 0;
-            //    return;
-            //}
-            //if (y == null)
-            //{
-            //    __result = 1;
-            //    return;
-            //}
-            //if (x == null)
-            //{
-            //    __result = -1;
-            //    return;
-            //}
-
-            //switch (sortType)
-            //{
-            //    case EQuestsSortType.Trader:
-            //        xField = Session.Traders.First(trader => trader.Id == x.Template.TraderId).LocalizedName;
-            //        yField = Session.Traders.First(trader => trader.Id == y.Template.TraderId).LocalizedName;
-            //        break;
-            //    case EQuestsSortType.Type:
-            //        xField = x.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
-            //        yField = y.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
-            //        break;
-            //    case EQuestsSortType.Task:
-            //        xField = x.Template.Name;
-            //        yField = y.Template.Name;
-            //        break;
-            //    case EQuestsSortType.Location:
-            //    case EQuestsSortType.Status:
-            //    case EQuestsSortType.Progress:
-            //        goto IL_DF;
-            //    default:
-            //        goto IL_DF;
-            //}
-            //if (!string.Equals(xField, yField))
-            //{
-            //    __result = string.Compare(xField, yField, true);
-            //    return;
-            //}
-            //__result = x.StartTime.CompareTo(y.StartTime);
-        //    __result = string.Compare(
-        //        Session.Traders.First(trader => trader.Id == x.Template.TraderId).LocalizedName,
-        //        Session.Traders.First(trader => trader.Id == y.Template.TraderId).LocalizedName,
-        //        true
-        //    );
-        //    return;
-        //IL_DF:
-        //    throw new ArgumentOutOfRangeException();
+            switch (sortType)
+            {
+                case EQuestsSortType.Trader:
+                    // Just replace these with localized name instead of ids
+                    xField = Session.Traders.First(trader => trader.Id == x.Template.TraderId).LocalizedName;
+                    yField = Session.Traders.First(trader => trader.Id == y.Template.TraderId).LocalizedName;
+                    break;
+                case EQuestsSortType.Type:
+                    xField = x.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
+                    yField = y.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
+                    break;
+                case EQuestsSortType.Task:
+                    xField = x.Template.Name;
+                    yField = y.Template.Name;
+                    break;
+                case EQuestsSortType.Location:
+                case EQuestsSortType.Status:
+                case EQuestsSortType.Progress:
+                    goto IL_DF;
+                default:
+                    goto IL_DF;
+            }
+            if (!string.Equals(xField, yField))
+            {
+                __result = string.Compare(xField, yField, StringComparison.Ordinal);
+                return false;
+            }
+            __result = x.StartTime.CompareTo(y.StartTime);
+            return false;
+        IL_DF:
+            throw new ArgumentOutOfRangeException();
         }
     }
 }
