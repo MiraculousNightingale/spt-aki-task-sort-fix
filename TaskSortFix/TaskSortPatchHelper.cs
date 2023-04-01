@@ -7,11 +7,12 @@ using System.Threading.Tasks;
 
 namespace TaskSortFix
 {
-    internal static class TaskHelper
+    internal static class TaskSortPatchHelper
     {
-        public static ISession Session { get; set; }
         // Type defs
         public static Type QuestStringFieldComparer = AccessTools.TypeByName("EFT.UI.TasksScreen+QuestStringFieldComparer");
         public static Type QuestLocationComparer = AccessTools.TypeByName("EFT.UI.TasksScreen+QuestLocationComparer");
+        public static Type QuestStatusComparer = AccessTools.TypeByName("EFT.UI.TasksScreen+QuestStatusComparer");
+        public static Type QuestProgressComparer = AccessTools.TypeByName("EFT.UI.TasksScreen+QuestProgressComparer");
     }
 }

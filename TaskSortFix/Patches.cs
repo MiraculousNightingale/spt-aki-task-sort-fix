@@ -13,25 +13,10 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.UIElements;
 using static System.Collections.Specialized.BitVector32;
-using static TaskSortFix.TaskHelper;
+using static TaskSortFix.TaskSortPatchHelper;
 
 namespace TaskSortFix
 {
-    // Get current session on TasksScreen.Show().
-    public class PatchTasksScreenShow : ModulePatch
-    {
-        protected override MethodBase GetTargetMethod()
-        {
-            return typeof(TasksScreen).GetMethod("Show", BindingFlags.Instance | BindingFlags.NonPublic);
-        }
-
-        [PatchPrefix]
-        private static void PatchPrefix(ISession session)
-        {
-            Session = session;
-            Logger.LogMessage($"Received session, has {Session.Traders.Count()} traders");
-        }
-    }
     public class PatchShowQuests : ModulePatch
     {
         protected override MethodBase GetTargetMethod()
@@ -83,34 +68,22 @@ namespace TaskSortFix
                     list.Sort(Activator.CreateInstance(QuestStringFieldComparer, new object[] { EQuestsSortType.Task }) as IComparer<QuestClass>);
                     break;
                 case EQuestsSortType.Location:
-                    //list.Sort(new TasksScreen.QuestLocationComparer(__instance._currentLocationId));
+                    list.Sort(Activator.CreateInstance(QuestLocationComparer, new object[] { currentLocationId }) as IComparer<QuestClass>);
                     break;
                 case EQuestsSortType.Status:
-                    //list.Sort(new TasksScreen.QuestStatusComparer());
+                    list.Sort(Activator.CreateInstance(QuestStatusComparer) as IComparer<QuestClass>);
                     break;
                 case EQuestsSortType.Progress:
-                    //list.Sort(new TasksScreen.QuestProgressComparer());
+                    list.Sort(Activator.CreateInstance(QuestProgressComparer) as IComparer<QuestClass>);
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
             }
-            string GetTraderLocalizedName(string traderId)
-            {
-                return session.Traders.First(trader => trader.Id == traderId).LocalizedName;
-            }
-
-            //list.Sort((a, b) => GetTraderLocalizedName(a.Template.TraderId).CompareTo(GetTraderLocalizedName(b.Template.TraderId)));
 
             if (__instance.SortAscend)
             {
                 list.Reverse();
             }
-
-            for (var id = 0; id < list.Count; id++)
-            {
-                Logger.LogMessage($"{id} QUEST NAME: {list[id].Template.Name}");
-            }
-
 
             foreach (QuestClass questClass in list)
             {
@@ -152,14 +125,9 @@ namespace TaskSortFix
             //Logger.LogMessage($"TraderId Localized: x {x.Template.TraderId.Localized()} y {y.Template.TraderId.Localized()}");
             //Logger.LogMessage($"TraderId LocalizedName: x {x.Template.TraderId.LocalizedName()} y {y.Template.TraderId.LocalizedName()}");
 
-            //  Doesn't work for Quest Type
-            //Logger.LogMessage($"QuestType: x {x.Template.} y {y.Template.QuestType}");
-            //Logger.LogMessage($"QuestType Localized: x {x.Template.QuestType.Localized()} y {y.Template.QuestType.Localized()}");
-
             var xField = __instance.GetType().GetField("_xField", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
             var yField = __instance.GetType().GetField("_yField", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
             var sortType = (EQuestsSortType)QuestStringFieldComparer.GetField("_sortType", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance);
-
 
             // Copy from source code, slightly tweaked to actually work.
             if (x == y)
@@ -181,9 +149,9 @@ namespace TaskSortFix
             switch (sortType)
             {
                 case EQuestsSortType.Trader:
-                    // Just replace these with localized name instead of ids
-                    xField = Session.Traders.First(trader => trader.Id == x.Template.TraderId).LocalizedName;
-                    yField = Session.Traders.First(trader => trader.Id == y.Template.TraderId).LocalizedName;
+                    // Add proper localization key to make it sort by localized trader nicknames
+                    xField = (x.Template.TraderId + " Nickname").Localized();
+                    yField = (y.Template.TraderId + " Nickname").Localized();
                     break;
                 case EQuestsSortType.Type:
                     xField = x.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
@@ -222,20 +190,9 @@ namespace TaskSortFix
         [PatchPrefix]
         private static bool PatchPrefix(object __instance, QuestClass x, QuestClass y, ref int __result)
         {
-            //  These literally return the id of a trader, there's no locale
-            //Logger.LogMessage($"TraderId Localized: x {x.Template.TraderId.Localized()} y {y.Template.TraderId.Localized()}");
-            //Logger.LogMessage($"TraderId LocalizedName: x {x.Template.TraderId.LocalizedName()} y {y.Template.TraderId.LocalizedName()}");
+            var _locationId = __instance.GetType().GetField("_locationId", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
 
-            //  Doesn't work for Quest Type
-            //Logger.LogMessage($"QuestType: x {x.Template.} y {y.Template.QuestType}");
-            //Logger.LogMessage($"QuestType Localized: x {x.Template.QuestType.Localized()} y {y.Template.QuestType.Localized()}");
-
-            var xField = __instance.GetType().GetField("_xField", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
-            var yField = __instance.GetType().GetField("_yField", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance) as string;
-            var sortType = (EQuestsSortType)QuestStringFieldComparer.GetField("_sortType", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(__instance);
-
-
-            // Copy from source code, slightly tweaked to actually work.
+            // Copy from source code, works overall. Tweaked to use Locale.
             if (x == y)
             {
                 __result = 0;
@@ -251,38 +208,42 @@ namespace TaskSortFix
                 __result = -1;
                 return false;
             }
-
-            switch (sortType)
+            string locationId = x.Template.LocationId;
+            string locationId2 = y.Template.LocationId;
+            if (string.Equals(locationId, locationId2))
             {
-                case EQuestsSortType.Trader:
-                    // Just replace these with localized name instead of ids
-                    xField = Session.Traders.First(trader => trader.Id == x.Template.TraderId).LocalizedName;
-                    yField = Session.Traders.First(trader => trader.Id == y.Template.TraderId).LocalizedName;
-                    break;
-                case EQuestsSortType.Type:
-                    xField = x.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
-                    yField = y.Template.QuestType.ToStringNoBox<RawQuestClass.EQuestType>();
-                    break;
-                case EQuestsSortType.Task:
-                    xField = x.Template.Name;
-                    yField = y.Template.Name;
-                    break;
-                case EQuestsSortType.Location:
-                case EQuestsSortType.Status:
-                case EQuestsSortType.Progress:
-                    goto IL_DF;
-                default:
-                    goto IL_DF;
-            }
-            if (!string.Equals(xField, yField))
-            {
-                __result = string.Compare(xField, yField, StringComparison.Ordinal);
+                __result = x.StartTime.CompareTo(y.StartTime);
                 return false;
             }
-            __result = x.StartTime.CompareTo(y.StartTime);
+            if (locationId2 == _locationId)
+            {
+                __result = 1;
+                return false;
+            }
+            if (locationId == _locationId)
+            {
+                __result = -1;
+                return false;
+            }
+            if (locationId2 == "any")
+            {
+                __result = 1;
+                return false;
+            }
+            if (locationId == "any")
+            {
+                __result = -1;
+                return false;
+            }
+            // Takes localized name instead of just id.
+            int num = string.Compare((locationId + " Name").Localized(), (locationId2 + " Name").Localized(), StringComparison.Ordinal);
+            if (num == 0)
+            {
+                __result = x.StartTime.CompareTo(y.StartTime);
+                return false;
+            }
+            __result = num;
             return false;
-        IL_DF:
-            throw new ArgumentOutOfRangeException();
         }
     }
 }

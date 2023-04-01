@@ -9,9 +9,9 @@ namespace TaskSortFix
         {
             // Plugin startup logic
             Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
-            new PatchTasksScreenShow().Enable(); // Receive Session from Show() metod, has to be first.
-            new PatchShowQuests().Enable();
-            new PatchQuestStringFieldComparer().Enable();
+            new PatchShowQuests().Enable(); // Reflection of original method with 1 line commented out.
+            new PatchQuestStringFieldComparer().Enable(); // Reflecion of original, but properly using locale for comparison
+            new PatchQuestLocationComparer().Enable(); // Reflection of original, but also using locale
         }
     }
 }
